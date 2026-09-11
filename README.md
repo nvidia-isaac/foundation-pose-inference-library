@@ -1,4 +1,4 @@
-# NVIDIA FoundationPose SDK
+# NVIDIA FoundationPose Inference Library
 
 A **low-latency, GPU-resident** runtime for
 [FoundationPose](https://arxiv.org/abs/2312.08344) — 6-DoF object pose **estimation**
