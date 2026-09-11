@@ -490,7 +490,7 @@ def load_frame(
 
 
 def build_object_specs(frame_meta: dict[str, Any]) -> list[ObjectSpec]:
-    """Convert normalized metadata into the SDK's `ObjectSpec` inputs.
+    """Convert normalized metadata into the library's `ObjectSpec` inputs.
 
     The single-object sample hardcodes one mesh, but the multi-object app has to build a spec list
     dynamically from the objects that survive frame parsing and filtering.
