@@ -100,7 +100,7 @@ flags needed. All commands in the root README work unchanged on Thor.
 - **Docker + NVIDIA Container Toolkit** per the official
   [Thor Docker Setup](https://docs.nvidia.com/jetson/agx-thor-devkit/user-guide/latest/setup_docker.html).
 - **Internet access** on the board (to pull the base image and fetch nvdiffrast).
-- **FoundationPose ONNX weights** — same NGC source as x86.
+- **FoundationPose ONNX weights** — same [Hugging Face source](https://huggingface.co/nvidia/foundationpose) as x86.
 - Everything runs inside `nvcr.io/nvidia/pytorch:26.05-py3` (aarch64 variant).
 
 ### Build

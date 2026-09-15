@@ -43,8 +43,8 @@ inference backend** through the C++ interfaces.
 ## Requirements
 
 - **NVIDIA driver ≥ 580** (the minimum driver line for CUDA 13).
-- **FoundationPose ONNX weights** — `refiner_net.onnx`, `score_net.onnx` from NGC
-  [`nvidia/tao/foundationpose:deployable_v1.0`](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tao/models/foundationpose)
+- **FoundationPose ONNX weights** — `refiner_net.onnx`, `score_net.onnx` from Hugging Face
+  [`nvidia/foundationpose`](https://huggingface.co/nvidia/foundationpose)
   (or `scripts/download_weights.sh`).
 - Everything runs **inside a container** (`nvcr.io/nvidia/pytorch:26.05-py3`, which
   bundles CUDA 13.2 and TensorRT 10.16); only Docker with the NVIDIA Container
