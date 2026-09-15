@@ -21,7 +21,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 MODEL_REPO="nvidia/foundationpose"
-BASE_URL="https://huggingface.co/${MODEL_REPO}/resolve/main"
+MODEL_REVISION="18d8309afc9790cddc03a1d50bc69954dc058693"
+BASE_URL="https://huggingface.co/${MODEL_REPO}/resolve/${MODEL_REVISION}"
 
 WEIGHTS_DIR="${1:-${WEIGHTS_DIR:-${FP_WEIGHTS_DIR:-./weights}}}"
 REFINER_DST="${WEIGHTS_DIR}/refiner_net.onnx"
