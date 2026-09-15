@@ -49,8 +49,8 @@ those terms before use. Version pins live in `docker/docker_build.sh`,
 
 ### FoundationPose ONNX weights
 
-- **Upstream:** https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tao/models/foundationpose
-- **License:** [NVIDIA AI Product License / NGC model EULA](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tao/models/foundationpose) (see the model card)
+- **Upstream:** https://huggingface.co/nvidia/foundationpose
+- **License:** [NVIDIA Open Model License](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/) (see the model card)
 - **Usage:** RefineNet/ScoreNet weights downloaded by `scripts/download_weights.sh`.
 
 ## Downloaded by the benchmark / data scripts
