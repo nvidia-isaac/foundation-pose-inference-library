@@ -448,7 +448,16 @@ TensorRtRunner::TensorRtRunner(RuntimeOptions options, Config config, int max_ba
     : options_(std::move(options)),
       config_(config),
       max_batch_(max_batch),
-      engine_batch_(std::min(max_batch, kMaxTensorRtEngineBatch)) {
+      engine_batch_([&]() {
+        const int bs = config.batch_size > 0 ? config.batch_size : max_batch;
+        const int effective_bs = std::min(max_batch, bs);
+        if (effective_bs > 0 && max_batch % effective_bs != 0) {
+          throw FoundationPoseError("max_batch (" + std::to_string(max_batch) +
+                                    ") must be divisible by effective_bs (" +
+                                    std::to_string(effective_bs) + ")");
+        }
+        return effective_bs;
+      }()) {
   if (max_batch_ <= 0 || engine_batch_ <= 0) {
     throw FoundationPoseError("TensorRT runner requires a positive batch size");
   }

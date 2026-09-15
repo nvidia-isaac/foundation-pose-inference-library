@@ -207,6 +207,15 @@ typedef enum fp_precision {
 /**
  * @brief Algorithm/runtime configuration. Fill with ::fp_default_config first, then
  *        override only what you need.
+ *
+ * @note **ABI:** new fields are only ever *appended* to this struct, never
+ *       inserted, so the offset of an existing field never changes. A caller
+ *       built against an older header must still be rebuilt before it links
+ *       against a newer library: ::fp_default_config writes the full current
+ *       struct, so passing a smaller (older) allocation overflows it. The
+ *       shared library carries an SOVERSION that is bumped whenever this
+ *       struct grows, so a stale binary fails to load instead of silently
+ *       corrupting memory.
  */
 typedef struct fp_config {
   int n_hypotheses;      /**< Register pose hypotheses (rotation grid size), default 252. */
@@ -217,11 +226,19 @@ typedef struct fp_config {
   int input_height;      /**< Network crop height, default 160. */
   int max_image_width;   /**< Max supported frame width (sizes the workspace). */
   int max_image_height;  /**< Max supported frame height (sizes the workspace). */
-  int capture_cuda_graph;/**< Non-zero: capture/replay the refinement loop as a CUDA graph. */
+  int capture_cuda_graph;/**< Non-zero: capture/replay the refinement loop as a CUDA graph.
+                          *   Mutually exclusive with micro-batching: see ::batch_size. */
   int model_free_sample_stride;       /**< Model-free: pixel stride when back-projecting reference views. */
   int model_free_max_vertices;        /**< Model-free: cap on reconstructed mesh vertices. */
   float model_free_depth_edge_threshold; /**< Model-free: depth-discontinuity edge threshold (meters). */
   int tensorrt_precision;             /**< TensorRT engine precision; see ::fp_precision_t. Default TF32; use FP32 for strict accuracy. */
+  int batch_size;        /**< Mini-batch chunk size for TensorRT execution, default 252.
+                          *   Effective batch is `min(n_hypotheses, batch_size)`, which must
+                          *   divide `n_hypotheses`. `0` selects the default. Cannot be combined
+                          *   with ::capture_cuda_graph when it is smaller than the active
+                          *   hypothesis count: ::fp_register_frame rejects that pair, because
+                          *   chunked refinement cannot be captured into a CUDA graph. Appended
+                          *   after ::tensorrt_precision to keep the preceding offsets stable. */
 } fp_config_t;
 
 /**

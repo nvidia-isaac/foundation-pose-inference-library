@@ -74,7 +74,14 @@ target_compile_definitions(foundation_pose_nvidia
 
 # Find the sibling renderer plugin next to the main library at runtime even
 # without LD_LIBRARY_PATH.
+#
+# SOVERSION is the C ABI contract for c_api.h. Bump it whenever a public struct
+# (e.g. fp_config_t) grows or a public signature changes, so a client built
+# against an older header fails to load instead of silently reading/writing
+# past its smaller struct.
 set_target_properties(foundation_pose_nvidia PROPERTIES
+  VERSION ${PROJECT_VERSION}
+  SOVERSION 1
   BUILD_RPATH "\$ORIGIN"
   INSTALL_RPATH "\$ORIGIN")
 

@@ -12,6 +12,7 @@ and **tracking** from RGB-D streams. The entire pipeline runs on the GPU with
 - **Multi-object:** estimate poses for several objects on one shared frame concurrently.
 - **Zero-copy input:** frames can be passed as CPU memory or CUDA device buffers (e.g. PyTorch CUDA tensors).
 - **Selectable inference precision:** TF32 (default), strict FP32, FP16, or BF16 TensorRT engines.
+- **Inference micro-batching:** configurable batch chunk size (`batch_size`) to evaluate pose hypotheses in smaller chunks, tailoring VRAM usage to memory-constrained GPUs.
 
 ## Architecture
 
@@ -104,6 +105,38 @@ scripts/download_bop_ycbv.sh       # BOP YCB-V dataset into $FP_DATA_DIR
 
 See [`example/`](example/) for all available examples, including synthetic mode
 (no dataset required) and multi-object registration.
+
+## Memory Optimization & Micro-Batching
+
+FoundationPose registration mode evaluates candidate rotation hypotheses (default: `n_hypotheses = 252`) across RefineNet and ScoreNet. On memory-constrained GPUs or in multi-model perception pipelines (e.g. running alongside FoundationStereo and SAM), you can tune memory usage through configuration:
+
+### Inference Micro-Batching (`batch_size`)
+
+By default, all hypotheses are executed in a single TensorRT batch (`batch_size = 252`). You can configure `batch_size` (via C ABI `fp_config_t::batch_size`, C++ `Config::batch_size`, or Python `RuntimeConfig(batch_size=...)`) to chunk TensorRT execution into smaller mini-batches (e.g. 42, 63, or 126):
+
+- **Lower VRAM footprint:** TensorRT engines and intermediate activation buffers are allocated to fit the smaller batch size, significantly reducing peak device memory during registration.
+- **Full search coverage preserved:** The total search coverage (`n_hypotheses`) remains unchanged; hypotheses are evaluated sequentially across chunks with zero accuracy loss.
+- **Must divide the hypothesis count:** when `batch_size` is smaller than the active hypothesis count, it must divide that count exactly. There is no partial final chunk — a non-divisible pair (e.g. `n_hypotheses = 100` with `batch_size = 42`) is rejected by `fp_register_frame` / `FoundationPose::registerFrame` with a `FoundationPoseError`. The suggested values below (42, 63, 126) all divide the default 252.
+- **Not compatible with `capture_cuda_graph`:** chunked refinement must synchronize the CUDA stream between chunks, which is illegal during graph capture. Enabling both is rejected with a `FoundationPoseError` whenever `batch_size` is smaller than the active hypothesis count. This only affects registration; tracking runs at batch size 1, never chunks, and keeps working with graph capture enabled.
+
+```python
+from foundation_pose_nvidia import Estimator, EstimatorOptions, RuntimeConfig
+
+config = RuntimeConfig(
+    n_hypotheses=252,  # total rotation search grid
+    batch_size=42,     # evaluate in micro-batches of 42
+)
+with Estimator(options, config) as est:
+    ...
+```
+
+### Engine Build Workspace and Batch Size on Lower-Memory GPUs
+
+When compiling TensorRT engines from ONNX (`refiner_net.onnx` and `score_net.onnx`), the builder allocates temporary workspace memory (default: 8 GB, `Config::tensorrt_workspace_bytes`). 
+
+Lowering the workspace size on lower-memory GPUs (e.g. 8 GB–16 GB cards or embedded platforms) **requires lowering `batch_size` accordingly**. The workspace needed by TensorRT's builder scales directly with the optimization profile's batch dimension:
+- In testing, building an engine with the default batch size of **252 requires at least ~6.1 GB** of builder workspace.
+- To successfully compile engines under constrained workspace limits (e.g. 2–4 GB), pair the reduced workspace with a smaller micro-batch size (such as 42, 63, or 126). This prevents out-of-memory errors during initial build without affecting downstream accuracy.
 
 ## Performance at a Glance
 
