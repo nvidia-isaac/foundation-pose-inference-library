@@ -110,6 +110,9 @@ Config toConfig(const fp_config_t* input) {
       config.tensorrt_precision = kFP32;
       break;
   }
+  if (input->batch_size > 0) {
+    config.batch_size = input->batch_size;
+  }
   return config;
 }
 
@@ -276,6 +279,7 @@ void fp_default_config(fp_config_t* config) {
   config->model_free_max_vertices = defaults.model_free_max_vertices;
   config->model_free_depth_edge_threshold = defaults.model_free_depth_edge_threshold;
   config->tensorrt_precision = static_cast<int>(defaults.tensorrt_precision);
+  config->batch_size = defaults.batch_size;
 }
 
 fp_handle_t* fp_create(const fp_create_options_t* options,

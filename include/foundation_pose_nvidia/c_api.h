@@ -217,11 +217,12 @@ typedef struct fp_config {
   int input_height;      /**< Network crop height, default 160. */
   int max_image_width;   /**< Max supported frame width (sizes the workspace). */
   int max_image_height;  /**< Max supported frame height (sizes the workspace). */
-  int capture_cuda_graph;/**< Non-zero: capture/replay the refinement loop as a CUDA graph. */
+  int capture_cuda_graph;/**< Non-zero: capture/replay the refinement loop as a CUDA graph (mutually exclusive with micro-batching; see ::batch_size). */
   int model_free_sample_stride;       /**< Model-free: pixel stride when back-projecting reference views. */
   int model_free_max_vertices;        /**< Model-free: cap on reconstructed mesh vertices. */
   float model_free_depth_edge_threshold; /**< Model-free: depth-discontinuity edge threshold (meters). */
   int tensorrt_precision;             /**< TensorRT engine precision; see ::fp_precision_t. Default TF32; use FP32 for strict accuracy. */
+  int batch_size;        /**< RefineNet mini-batch chunk size for TensorRT execution, default 252 (must divide n_hypotheses; ScoreNet is not micro-batched). */
 } fp_config_t;
 
 /**

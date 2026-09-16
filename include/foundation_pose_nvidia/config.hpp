@@ -63,6 +63,7 @@ struct Config {
   // Default matches TensorRT's own default (TF32 allowed). Set kFP32 for strict
   // IEEE FP32 (recommended for cross-GPU accuracy parity, e.g. x86 vs Jetson).
   TensorrtPrecision tensorrt_precision = TensorrtPrecision::kTF32;
+  int batch_size = 252;  // RefineNet mini-batch chunk size (effective bs = min(n_hypotheses, batch_size); ScoreNet is not micro-batched)
 };
 
 struct RuntimeOptions {

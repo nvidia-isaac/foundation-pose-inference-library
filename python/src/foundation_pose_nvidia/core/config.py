@@ -36,6 +36,9 @@ class RuntimeConfig:
     max_image_height: int | None = None
     capture_cuda_graph: bool | None = None
     tensorrt_precision: Precision | int | None = None
+    # Appended last so positional construction of the pre-existing fields is
+    # unchanged (mirrors the fp_config_t append-only layout).
+    batch_size: int | None = None
 
     def to_ctypes(self, library: FPLibrary) -> Config:
         config = library.default_config()
@@ -61,4 +64,5 @@ class RuntimeConfig:
             max_image_height=config.max_image_height,
             capture_cuda_graph=bool(config.capture_cuda_graph),
             tensorrt_precision=Precision(config.tensorrt_precision),
+            batch_size=config.batch_size,
         )

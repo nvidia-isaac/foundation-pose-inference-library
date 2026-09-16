@@ -63,6 +63,9 @@ class CreateOptions(C.Structure):
 
 
 class Config(C.Structure):
+    """Mirrors fp_config_t. Fields are appended, never inserted: keep this in
+    the same order as include/foundation_pose_nvidia/c_api.h."""
+
     _fields_ = [
         ("n_hypotheses", C.c_int),
         ("n_refine_iters", C.c_int),
@@ -77,6 +80,7 @@ class Config(C.Structure):
         ("model_free_max_vertices", C.c_int),
         ("model_free_depth_edge_threshold", C.c_float),
         ("tensorrt_precision", C.c_int),
+        ("batch_size", C.c_int),
     ]
 
 

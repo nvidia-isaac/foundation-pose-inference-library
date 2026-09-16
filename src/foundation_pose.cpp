@@ -327,6 +327,19 @@ PoseEstimate FoundationPose::registerFrame(const std::uint8_t* rgb_u8,
   if (active_hypotheses_ <= 0) {
     throw FoundationPoseError("No active hypotheses available");
   }
+  const int batch_size = config_.batch_size > 0 ? config_.batch_size : active_hypotheses_;
+  const int effective_bs = std::min(active_hypotheses_, batch_size);
+  if (effective_bs > 0 && active_hypotheses_ % effective_bs != 0) {
+    throw FoundationPoseError("active_hypotheses (" + std::to_string(active_hypotheses_) +
+                              ") must be divisible by batch_size (" +
+                              std::to_string(effective_bs) + ")");
+  }
+  // CUDA graph capture cannot record inter-chunk stream synchronization during micro-batching.
+  if (config_.capture_cuda_graph && effective_bs < active_hypotheses_) {
+    throw FoundationPoseError("capture_cuda_graph is not supported when batch_size (" +
+                              std::to_string(effective_bs) + ") < active_hypotheses (" +
+                              std::to_string(active_hypotheses_) + ")");
+  }
 
   uploadFrameToDevice(rgb_u8, depth_m, mask_u8, width, height, *workspace_,
                       stream_->get());

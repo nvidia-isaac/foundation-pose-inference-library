@@ -12,6 +12,7 @@ and **tracking** from RGB-D streams. The entire pipeline runs on the GPU with
 - **Multi-object:** estimate poses for several objects on one shared frame concurrently.
 - **Zero-copy input:** frames can be passed as CPU memory or CUDA device buffers (e.g. PyTorch CUDA tensors).
 - **Selectable inference precision:** TF32 (default), strict FP32, FP16, or BF16 TensorRT engines.
+- **Inference micro-batching:** configurable batch chunk size (`batch_size`) to evaluate pose hypotheses in smaller chunks, tailoring VRAM usage to memory-constrained GPUs.
 
 ## Architecture
 
@@ -104,6 +105,36 @@ scripts/download_bop_ycbv.sh       # BOP YCB-V dataset into $FP_DATA_DIR
 
 See [`example/`](example/) for all available examples, including synthetic mode
 (no dataset required) and multi-object registration.
+
+## Memory Optimization & Micro-Batching
+
+FoundationPose registration mode evaluates candidate rotation hypotheses (default: `n_hypotheses = 252`) across RefineNet and ScoreNet. On memory-constrained GPUs or in multi-model perception pipelines (e.g. running alongside FoundationStereo and SAM), you can tune memory usage through configuration:
+
+### Inference Micro-Batching (`batch_size`)
+
+By default, all hypotheses are executed in a single TensorRT batch (`batch_size = 252`). You can configure `batch_size` (via C ABI `fp_config_t::batch_size`, C++ `Config::batch_size`, or Python `RuntimeConfig(batch_size=...)`) to chunk TensorRT execution into smaller mini-batches (e.g. 42, 63, or 126):
+
+- **Lower VRAM footprint:** RefineNet's TensorRT engine and activation buffers are allocated to fit the smaller batch size, reducing peak device memory during registration (ScoreNet uses cross-hypothesis attention and always runs at full batch).
+- **Full search coverage preserved:** The total search coverage (`n_hypotheses`) remains unchanged; RefineNet hypotheses are evaluated sequentially across chunks. Note that `batch_size` must divide `n_hypotheses` and cannot be combined with `capture_cuda_graph`.
+
+```python
+from foundation_pose_nvidia import Estimator, EstimatorOptions, RuntimeConfig
+
+config = RuntimeConfig(
+    n_hypotheses=252,  # total rotation search grid
+    batch_size=42,     # evaluate in micro-batches of 42
+)
+with Estimator(options, config) as est:
+    ...
+```
+
+### Engine Build Workspace and Batch Size on Lower-Memory GPUs
+
+When compiling TensorRT engines from ONNX (`refiner_net.onnx` and `score_net.onnx`), the builder allocates temporary workspace memory (default: 8 GB, `Config::tensorrt_workspace_bytes`). 
+
+Lowering the workspace size on lower-memory GPUs (e.g. 8 GB–16 GB cards or embedded platforms) **requires lowering `batch_size` accordingly**. The workspace needed by TensorRT's builder scales directly with the optimization profile's batch dimension:
+- In testing, building an engine with the default batch size of **252 requires at least ~6.1 GB** of builder workspace.
+- To successfully compile RefineNet under constrained workspace limits (e.g. 2–4 GB), pair the reduced workspace with a smaller micro-batch size (such as 42, 63, or 126). Note that ScoreNet always builds and runs at full batch.
 
 ## Performance at a Glance
 
