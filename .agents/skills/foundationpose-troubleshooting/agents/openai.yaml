@@ -1,0 +1,3 @@
+interface:
+  display_name: "FoundationPose Troubleshooting"
+  short_description: "Diagnose pose errors and collect numeric traces"
