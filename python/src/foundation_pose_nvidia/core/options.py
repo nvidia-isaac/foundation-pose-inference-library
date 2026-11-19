@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 from dataclasses import dataclass
+from collections.abc import Sequence
 from pathlib import Path
 
 
@@ -18,7 +19,7 @@ def _encode_optional(value: str | Path | None) -> bytes | None:
 
 @dataclass
 class EstimatorOptions:
-    """Paths and runtime knobs passed to fp_create."""
+    """Paths, runtime options, and per-object symmetry configuration."""
 
     cad_path: Path
     refine_model_path: Path
@@ -34,6 +35,8 @@ class EstimatorOptions:
     refine_rotation_output_name: str | None = None
     score_output_name: str | None = None
     prepare: bool = True
+    # Per-object, object-frame symmetries; empty disables temporal filtering.
+    symmetry_axes: Sequence[str] = ()
 
     @classmethod
     def from_env(
@@ -46,6 +49,7 @@ class EstimatorOptions:
         device_id: int = 0,
         mesh_unit_scale: float = 1.0,
         prepare: bool = True,
+        symmetry_axes: Sequence[str] = (),
     ) -> EstimatorOptions:
         return cls(
             cad_path=Path(cad_path),
@@ -57,6 +61,7 @@ class EstimatorOptions:
             device_id=device_id,
             mesh_unit_scale=mesh_unit_scale,
             prepare=prepare,
+            symmetry_axes=symmetry_axes,
         )
 
     @classmethod
@@ -76,6 +81,7 @@ class EstimatorOptions:
             refine_rotation_output_name=args.refine_rotation_output_name,
             score_output_name=args.score_output_name,
             prepare=bool(args.prepare_estimators),
+            symmetry_axes=getattr(args, "symmetry_axes", ()),
         )
 
     def encoded_strings(self) -> list[bytes | None]:

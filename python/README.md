@@ -71,3 +71,28 @@ depth in meters); they are validated, never converted. `intrinsics` stays host.
 
 See [`example/python/fp_single_object_app/`](../example/python/fp_single_object_app/)
 for a full, runnable synthetic-frame demo.
+
+## Symmetry filtering
+
+Enable temporal continuity for an object with a 180-degree symmetry around its
+local z axis:
+
+```python
+options = EstimatorOptions.from_env(
+    "plate.obj", mesh_unit_scale=0.01, symmetry_axes=["z_180"]
+)
+with Estimator(options, config) as est:
+    first = est.register(RgbdFrame(rgb, depth_m, K, mask))
+    following = est.track(RgbdFrame(rgb, depth_m, K))
+    # Both calls return the selected equivalent and update the tracking seed.
+    est.reset_tracking()  # Clear the anchor before a new episode.
+```
+
+Filtering defaults to disabled. `est.set_symmetry_axes([])` disables it;
+`est.reset_tracking(last_accepted_pose)` restores an externally accepted pose
+after a quality guard rejects an output. For multiple objects, configure
+`ObjectSpec(..., symmetry_axes=["z_180"])` independently for each mesh.
+
+See [Symmetry filter](../doc/SYMMETRY_FILTER.md) for all axis options, original
+mesh origin handling, and limitations. Rebuild the native library to enable this
+feature; existing C structure layouts are unchanged.

@@ -1,5 +1,35 @@
 # Tests
 
+## Symmetry filter tests
+
+Build with `BUILD_TESTING=ON` (default), then run:
+
+```bash
+ctest --test-dir build --output-on-failure
+PYTHONPATH=python/src python3 tests/test_symmetry_api.py
+FP_TEST_GPU=1 PYTHONPATH=python/src python3 tests/test_symmetry_api.py
+```
+
+`symmetry_filter` checks the CPU geometry, corner-origin correction, axis
+configuration, invalid inputs, and randomized poses. `symmetry_tracking` uses
+real CUDA buffers and pose-update kernels with a deterministic mock refiner and
+renderer to force a flip, verify register/track continuity, and verify feedback
+into the next tracking step. It skips if CUDA is unavailable.
+
+The Python suite checks bindings, error handling, and cleanup without a GPU.
+`FP_TEST_GPU=1` also exercises real C handles, per-object group configuration,
+and seeded zero-iteration tracking. These tests do not need weights or datasets
+and do not measure neural-network pose accuracy. Existing
+`tests/test_python_wrapper.py` covers the default Python path.
+
+For a CPU-only geometry check without configuring CUDA/CMake:
+
+```bash
+c++ -std=c++20 -Iinclude tests/test_symmetry_filter.cpp src/symmetry_filter.cpp \
+  -o /tmp/test_symmetry_filter
+/tmp/test_symmetry_filter
+```
+
 ## Smoke test
 
 Quick sanity check that the built library and TensorRT engines work end-to-end:

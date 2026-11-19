@@ -323,6 +323,45 @@ FP_API int fp_prepare(fp_handle_t* handle,
                       size_t error_buffer_size);
 
 /**
+ * @brief Configure temporal symmetry filtering for one object (off by default).
+ *
+ * Uses Isaac ROS axis strings, e.g. {"z_180"}. Numeric angles are explicit
+ * alternatives, not step sizes; identity is included. "x_full", "y_full", and
+ * "z_full" sample rotations at 30-degree intervals. Combinations use Rz*Ry*Rx.
+ * Each symmetry rotates about the scaled mesh center, correcting both public
+ * orientation and origin translation. The equivalent closest in rotation to the
+ * previous accepted pose is returned AND used to seed subsequent tracking.
+ * Registration hypotheses and scores are unchanged. The first pose is the anchor.
+ *
+ * Pass axes=NULL, axis_count=0 to disable. Invalid entries fail atomically.
+ * Strings are copied during the call. Reconfiguration retains the accepted pose;
+ * call fp_reset_tracking to start a new episode. For a group, use fp_group_handle
+ * to configure each object independently, outside concurrent group calls.
+ * @return 0 on success, non-zero on failure (message in error_buffer).
+ */
+FP_API int fp_set_symmetry_axes(fp_handle_t* handle,
+                                const char* const* axes,
+                                size_t axis_count,
+                                char* error_buffer,
+                                size_t error_buffer_size);
+
+/**
+ * @brief Clear tracking, or restore an externally accepted pose and its anchor.
+ *
+ * NULL clears state and requires registration before the next track. Otherwise
+ * reference_pose_row_major must point to 16 host floats representing a finite
+ * original-mesh-frame cam_T_obj in metres. It is copied and validated as SE(3),
+ * then converted to the internal centered frame. Symmetry settings are retained.
+ * Use this when an external quality guard rejects an estimate, or to seed a
+ * known first orientation. Caller must select the estimator's CUDA device.
+ * @return 0 on success, non-zero on failure (message in error_buffer).
+ */
+FP_API int fp_reset_tracking(fp_handle_t* handle,
+                             const float* reference_pose_row_major,
+                             char* error_buffer,
+                             size_t error_buffer_size);
+
+/**
  * @brief Destroy an estimator handle and free all its GPU/host resources.
  * @param[in] handle Handle from ::fp_create / ::fp_create_model_free. `NULL` is a no-op.
  */

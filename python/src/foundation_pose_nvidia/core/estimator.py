@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ctypes as C
 import time
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -32,6 +33,7 @@ class Estimator:
         prepare_track_batch: bool = False,
     ):
         self.handle = None
+        self._symmetry_axes: tuple[str, ...] = ()
         self._owns_library = library is None
         self.library = library or load_library(print_build_info=True)
         self.lib = self.library.cdll
@@ -77,6 +79,8 @@ class Estimator:
             raise FoundationPoseError(err.value.decode("utf-8"))
 
         try:
+            if options.symmetry_axes:
+                self.set_symmetry_axes(options.symmetry_axes)
             if options.prepare and prepare_batch is not None:
                 self._prepare(int(prepare_batch))
             elif prepare_track_batch:
@@ -89,6 +93,27 @@ class Estimator:
     @property
     def config(self) -> Config:
         return self._config
+
+    @property
+    def symmetry_axes(self) -> tuple[str, ...]:
+        return self._symmetry_axes
+
+    def set_symmetry_axes(self, axes: Sequence[str]) -> None:
+        """Select temporal equivalents, e.g. ['z_180']; [] disables filtering.
+
+        Retains the previous accepted pose across reconfiguration/registration.
+        Numeric angles are explicit alternatives; *_full samples every 30 deg.
+        """
+        self.library.set_symmetry_axes(self.handle, axes)
+        self._symmetry_axes = tuple(axes)
+
+    def reset_tracking(self, reference_pose: np.ndarray | None = None) -> None:
+        """Clear tracking, or restore an accepted original-frame cam_T_obj.
+
+        Use a saved pose to undo an output rejected by an external quality gate.
+        None starts a new episode and requires registration before tracking.
+        """
+        self.library.reset_tracking(self.handle, reference_pose)
 
     def _prepare(self, batch_size: int) -> None:
         err = C.create_string_buffer(4096)
