@@ -54,6 +54,8 @@ Options:
   --mesh-unit-scale <float>  Scale applied to CAD vertices before preprocessing.
                              Use 0.001 for BOP YCB-V meshes in millimeters.
                              Default: 0.001
+  --symmetry-axis <spec>     Temporal symmetry filter, e.g. z_180 or x_full.
+                             Repeat for multiple alternatives. Default: disabled.
   -h, --help                 Show this help text.
   --version                  Print build/backend information.
 
@@ -89,7 +91,8 @@ int runSmoke(const std::string& cad,
              const std::string& cache,
              float mesh_unit_scale,
              std::string_view mode,
-             bool model_free) {
+             bool model_free,
+             const std::vector<std::string>& symmetry_axes) {
   fp_config_t config{};
   fp_default_config(&config);
   config.n_hypotheses = 12;
@@ -156,6 +159,13 @@ int runSmoke(const std::string& cad,
     std::cerr << error.data() << '\n';
     return 1;
   }
+  std::vector<const char*> axes;
+  for (const auto& axis : symmetry_axes) axes.push_back(axis.c_str());
+  if (fp_set_symmetry_axes(handle, axes.data(), axes.size(), error.data(), error.size()) != 0) {
+    std::cerr << error.data() << '\n';
+    fp_destroy(handle);
+    return 1;
+  }
 
   fp_image_view_t view{};
   view.width = width;
@@ -199,6 +209,7 @@ int main(int argc, char** argv) {
   std::string cache = "engine_cache";
   std::string mode = "register";
   float mesh_unit_scale = 0.001f;
+  std::vector<std::string> symmetry_axes;
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "--version") {
@@ -221,6 +232,8 @@ int main(int argc, char** argv) {
       cache = argv[++i];
     } else if (arg == "--mesh-unit-scale" && i + 1 < argc) {
       mesh_unit_scale = std::stof(argv[++i]);
+    } else if (arg == "--symmetry-axis" && i + 1 < argc) {
+      symmetry_axes.emplace_back(argv[++i]);
     } else if (arg == "--help" || arg == "-h") {
       printUsage();
       return 0;
@@ -246,5 +259,5 @@ int main(int argc, char** argv) {
     std::cerr << "Smoke tests require --refine and --score\n";
     return 2;
   }
-  return runSmoke(cad, refine, score, cache, mesh_unit_scale, mode, model_free_smoke);
+  return runSmoke(cad, refine, score, cache, mesh_unit_scale, mode, model_free_smoke, symmetry_axes);
 }

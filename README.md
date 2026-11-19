@@ -10,6 +10,7 @@ and **tracking** from RGB-D streams. The entire pipeline runs on the GPU with
 - **Two modalities:** model-based (CAD mesh, OBJ/PLY) and model-free (RGB-D-mask reference views).
 - **Two modes:** `register` (one-shot global pose search) and `track` (frame-to-frame refinement at hundreds of Hz).
 - **Multi-object:** estimate poses for several objects on one shared frame concurrently.
+- **Symmetry continuity:** optional per-object axis configuration selects a consistent equivalent pose and feeds it back into tracking; see [configuration and examples](doc/SYMMETRY_FILTER.md).
 - **Zero-copy input:** frames can be passed as CPU memory or CUDA device buffers (e.g. PyTorch CUDA tensors).
 - **Selectable inference precision:** TF32 (default), strict FP32, FP16, or BF16 TensorRT engines.
 - **Inference micro-batching:** configurable batch chunk size (`batch_size`) to evaluate pose hypotheses in smaller chunks, tailoring VRAM usage to memory-constrained GPUs.

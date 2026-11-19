@@ -16,6 +16,7 @@
 #include "foundation_pose_nvidia/inference_runner.hpp"
 #include "foundation_pose_nvidia/mesh.hpp"
 #include "foundation_pose_nvidia/renderer.hpp"
+#include "foundation_pose_nvidia/symmetry_filter.hpp"
 #include "foundation_pose_nvidia/tensorrt_runner.hpp"
 #include "foundation_pose_nvidia/types.hpp"
 
@@ -45,6 +46,13 @@ class FoundationPose {
       Config config = {});
 
   void prepareForBatch(int batch_size);
+
+  // Per-object temporal symmetry filtering; empty axes disable it. Changes
+  // preserve the last accepted pose. Registration hypotheses are unchanged.
+  void setSymmetryAxes(const std::vector<std::string>& axes);
+  // Clear tracking/continuity for a new episode, or restore an accepted
+  // original-frame pose (metres) as both the orientation anchor and track seed.
+  void resetTracking(std::optional<Mat4f> reference_pose = std::nullopt);
 
   PoseEstimate registerFrame(const std::uint8_t* rgb_u8,
                              const float* depth_m,
@@ -93,13 +101,15 @@ class FoundationPose {
                               CameraIntrinsics intrinsics);
   void destroyRefinementGraph() noexcept;
   PoseEstimate readBestResult();
+  void storePreviousPose(const Mat4f& pose);
 
   PreprocessedMesh mesh_;
   RuntimeOptions runtime_options_;
   Config config_;
   int max_hypotheses_ = 0;
   int active_hypotheses_ = 0;
-  bool has_previous_pose_ = false;
+  std::optional<Mat4f> previous_pose_;
+  SymmetryFilter symmetry_filter_;
 
   std::unique_ptr<CudaStream> stream_;
   std::unique_ptr<GpuWorkspace> workspace_;

@@ -354,6 +354,50 @@ void fp_destroy(fp_handle_t* handle) {
   delete handle;
 }
 
+int fp_set_symmetry_axes(fp_handle_t* handle,
+                         const char* const* axes,
+                         size_t axis_count,
+                         char* error_buffer,
+                         size_t error_buffer_size) {
+  try {
+    if (handle == nullptr || !handle->estimator) throw FoundationPoseError("Invalid handle");
+    if (axis_count > 64 || (axis_count != 0 && axes == nullptr)) {
+      throw FoundationPoseError("Expected at most 64 symmetry axis strings");
+    }
+    std::vector<std::string> values;
+    values.reserve(axis_count);
+    for (size_t i = 0; i < axis_count; ++i) {
+      if (axes[i] == nullptr) throw FoundationPoseError("Symmetry axis strings must not be NULL");
+      values.emplace_back(axes[i]);
+    }
+    handle->estimator->setSymmetryAxes(values);
+    writeError(error_buffer, error_buffer_size, "");
+    return 0;
+  } catch (const std::exception& e) {
+    writeError(error_buffer, error_buffer_size, e.what());
+    return 1;
+  }
+}
+
+int fp_reset_tracking(fp_handle_t* handle,
+                      const float* reference_pose_row_major,
+                      char* error_buffer,
+                      size_t error_buffer_size) {
+  try {
+    if (handle == nullptr || !handle->estimator) throw FoundationPoseError("Invalid handle");
+    if (reference_pose_row_major == nullptr) {
+      handle->estimator->resetTracking();
+    } else {
+      handle->estimator->resetTracking(makeMat4OrIdentity(reference_pose_row_major));
+    }
+    writeError(error_buffer, error_buffer_size, "");
+    return 0;
+  } catch (const std::exception& e) {
+    writeError(error_buffer, error_buffer_size, e.what());
+    return 1;
+  }
+}
+
 int fp_register_frame(fp_handle_t* handle,
                       const fp_image_view_t* image,
                       int n_refine,

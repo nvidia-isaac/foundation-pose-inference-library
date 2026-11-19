@@ -60,6 +60,7 @@ add_library(foundation_pose_nvidia SHARED
   src/foundation_pose.cpp
   src/mesh.cpp
   src/pipeline_utils.cpp
+  src/symmetry_filter.cpp
   src/tensorrt_runner.cu)
 
 target_include_directories(foundation_pose_nvidia
@@ -138,3 +139,14 @@ install(TARGETS foundation_pose_nvidia foundation_pose_nvidia_cli
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include)
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(test_symmetry_filter tests/test_symmetry_filter.cpp src/symmetry_filter.cpp)
+  target_include_directories(test_symmetry_filter PRIVATE include)
+  add_test(NAME symmetry_filter COMMAND test_symmetry_filter)
+  add_executable(test_symmetry_tracking tests/test_symmetry_tracking.cpp)
+  target_link_libraries(test_symmetry_tracking PRIVATE foundation_pose_nvidia CUDA::cudart)
+  add_test(NAME symmetry_tracking COMMAND test_symmetry_tracking)
+  set_tests_properties(symmetry_tracking PROPERTIES SKIP_RETURN_CODE 77)
+endif()

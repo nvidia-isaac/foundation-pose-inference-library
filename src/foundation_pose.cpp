@@ -202,7 +202,8 @@ FoundationPose::FoundationPose(PreprocessedMesh mesh,
     : mesh_(std::move(mesh)),
       runtime_options_(std::move(runtime_options)),
       config_(config),
-      max_hypotheses_(maxHypothesesFor(config_)) {
+      max_hypotheses_(maxHypothesesFor(config_)),
+      symmetry_filter_(mesh_.center) {
   if (!inference_runner || !renderer) {
     throw FoundationPoseError("FoundationPose requires inference and renderer backends");
   }
@@ -241,7 +242,8 @@ FoundationPose::FoundationPose(FoundationPose&& other) noexcept
       config_(other.config_),
       max_hypotheses_(std::exchange(other.max_hypotheses_, 0)),
       active_hypotheses_(std::exchange(other.active_hypotheses_, 0)),
-      has_previous_pose_(std::exchange(other.has_previous_pose_, false)),
+      previous_pose_(std::exchange(other.previous_pose_, std::nullopt)),
+      symmetry_filter_(std::move(other.symmetry_filter_)),
       stream_(std::move(other.stream_)),
       workspace_(std::move(other.workspace_)),
       device_mesh_(std::move(other.device_mesh_)),
@@ -262,7 +264,8 @@ FoundationPose& FoundationPose::operator=(FoundationPose&& other) noexcept {
     config_ = other.config_;
     max_hypotheses_ = std::exchange(other.max_hypotheses_, 0);
     active_hypotheses_ = std::exchange(other.active_hypotheses_, 0);
-    has_previous_pose_ = std::exchange(other.has_previous_pose_, false);
+    previous_pose_ = std::exchange(other.previous_pose_, std::nullopt);
+    symmetry_filter_ = std::move(other.symmetry_filter_);
     stream_ = std::move(other.stream_);
     workspace_ = std::move(other.workspace_);
     device_mesh_ = std::move(other.device_mesh_);
@@ -307,6 +310,29 @@ void FoundationPose::prepareForBatch(int batch_size) {
     throw FoundationPoseError("prepare batch size exceeds configured maximum");
   }
   inference_->prepareForBatch(batch_size);
+}
+
+void FoundationPose::setSymmetryAxes(const std::vector<std::string>& axes) {
+  symmetry_filter_.setAxes(axes);
+}
+
+void FoundationPose::resetTracking(std::optional<Mat4f> reference_pose) {
+  if (reference_pose) {
+    SymmetryFilter::validatePose(*reference_pose);
+    storePreviousPose(*reference_pose);
+  } else {
+    previous_pose_.reset();
+  }
+}
+
+void FoundationPose::storePreviousPose(const Mat4f& pose) {
+  const Mat4f centered = symmetry_filter_.toCenteredPose(pose);
+  checkCuda(cudaMemcpyAsync(workspace_->previous_centered_pose.data(), centered.values.data(),
+                            sizeof(centered), cudaMemcpyHostToDevice, stream_->get()),
+            "cudaMemcpyAsync filtered tracking pose");
+  // The stack-backed upload must complete before its source goes out of scope.
+  stream_->synchronize();
+  previous_pose_ = pose;
 }
 
 PoseEstimate FoundationPose::registerFrame(const std::uint8_t* rgb_u8,
@@ -365,14 +391,19 @@ PoseEstimate FoundationPose::registerFrame(const std::uint8_t* rgb_u8,
                             cudaMemcpyDeviceToHost, stream_->get()),
             "cudaMemcpyAsync best result");
   stream_->synchronize();
-  checkCuda(cudaMemcpyAsync(workspace_->previous_centered_pose.data(),
-                            poses + host_result.index * 16, 16 * sizeof(float),
-                            cudaMemcpyDeviceToDevice, stream_->get()),
-            "cudaMemcpyAsync previous pose");
-  has_previous_pose_ = true;
   PoseEstimate estimate;
   estimate.pose = host_result.pose;
   estimate.score = host_result.score;
+  if (symmetry_filter_.enabled()) {
+    estimate.pose = symmetry_filter_.select(estimate.pose, previous_pose_ ? &*previous_pose_ : nullptr);
+    storePreviousPose(estimate.pose);
+  } else {
+    checkCuda(cudaMemcpyAsync(workspace_->previous_centered_pose.data(),
+                              poses + host_result.index * 16, 16 * sizeof(float),
+                              cudaMemcpyDeviceToDevice, stream_->get()),
+              "cudaMemcpyAsync previous pose");
+    previous_pose_ = estimate.pose;
+  }
   return estimate;
 }
 
@@ -384,7 +415,7 @@ PoseEstimate FoundationPose::trackFrame(const std::uint8_t* rgb_u8,
                                         int n_refine) {
   validateFrame(rgb_u8, depth_m, nullptr, width, height, false);
   intrinsics = validateIntrinsics(intrinsics);
-  if (!has_previous_pose_) {
+  if (!previous_pose_) {
     throw FoundationPoseError("No previous pose. Call registerFrame before trackFrame.");
   }
   const int refine_iters = n_refine >= 0 ? n_refine : config_.n_track_iters;
@@ -405,8 +436,16 @@ PoseEstimate FoundationPose::trackFrame(const std::uint8_t* rgb_u8,
   selectBestPoseOnDevice(poses, workspace_->scores.as<float>(), 1, mesh_.center,
                          workspace_->best_result.as<DevicePoseResult>(),
                          stream_->get());
-  copyPoseOnDevice(poses, workspace_->previous_centered_pose.as<float>(), stream_->get());
-  return readBestResult();
+  if (!symmetry_filter_.enabled()) {
+    copyPoseOnDevice(poses, workspace_->previous_centered_pose.as<float>(), stream_->get());
+    PoseEstimate estimate = readBestResult();
+    previous_pose_ = estimate.pose;
+    return estimate;
+  }
+  PoseEstimate estimate = readBestResult();
+  estimate.pose = symmetry_filter_.select(estimate.pose, &*previous_pose_);
+  storePreviousPose(estimate.pose);
+  return estimate;
 }
 
 void FoundationPose::validateFrame(const std::uint8_t* rgb_u8,

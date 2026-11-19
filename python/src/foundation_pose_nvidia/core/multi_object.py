@@ -5,7 +5,8 @@
 from __future__ import annotations
 
 import ctypes as C
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ class ObjectSpec:
     name: str
     cad_path: Path
     mesh_unit_scale: float = 1.0
+    symmetry_axes: Sequence[str] = ()
 
 
 @dataclass(frozen=True)
@@ -100,8 +102,9 @@ class MultiObjectEstimator:
 
     def _create_group(self, frame: Any, objects: list[ObjectSpec]) -> None:
         if self.group:
-            if [obj.name for obj in objects] != [obj.name for obj in self.objects]:
-                raise ValueError("Cannot reuse a multi-object group with different objects")
+            normalized = [replace(obj, symmetry_axes=tuple(obj.symmetry_axes)) for obj in objects]
+            if normalized != self.objects:
+                raise ValueError("Cannot reuse a multi-object group with different objects or symmetry settings")
             return
 
         self.library = load_library(self.options.library_path, print_build_info=False)
@@ -116,7 +119,7 @@ class MultiObjectEstimator:
             self.config.n_refine_iters = self.options.n_refine
         self.config.capture_cuda_graph = 1 if self.options.capture_cuda_graph else 0
 
-        self.objects = list(objects)
+        self.objects = [replace(obj, symmetry_axes=tuple(obj.symmetry_axes)) for obj in objects]
         create_options = (CreateOptions * len(objects))()
         self._strings = []
         for idx, obj in enumerate(objects):
@@ -150,6 +153,14 @@ class MultiObjectEstimator:
             raise RuntimeError(
                 f"fp_group_create failed: {err.value.decode(errors='replace')}"
             )
+        try:
+            for idx, obj in enumerate(objects):
+                if obj.symmetry_axes:
+                    handle = self.lib.fp_group_handle(self.group, idx)
+                    self.library.set_symmetry_axes(handle, obj.symmetry_axes)
+        except BaseException:
+            self.close()
+            raise
         size = self.lib.fp_group_size(self.group)
         if size != len(objects):
             raise RuntimeError(f"fp_group_size returned {size}, expected {len(objects)}")
