@@ -50,6 +50,10 @@ one unchanged result does not rule it out. For synthetic references, render CAD 
 an independently known pose using calibrated intrinsics, camera Z, and the visible
 silhouette. Preserve occluders and measured background. Label synthetic depth
 clearly: improvement may also reflect closer agreement with the runtime renderer.
+If no independent pose/depth reference exists, use the
+[RGB-derived pseudo-reference workflow](pseudo-references.md). Do not silently
+substitute the current FP pose as GT or fit the reference to the same suspect
+depth being tested.
 
 ## Calibration, mesh, and coordinate frames
 
@@ -84,7 +88,9 @@ are misleading for symmetric objects.
 Back-project measured depth with calibrated intrinsics, transform the original
 CAD by the public pose, and inspect both in the same 3D camera frame. Use axes,
 units, and wireframe/transparency. Retain local views or describe the mismatch;
-the library itself has no debug-image exporter. CAD/posed mesh stays local.
+the library itself has no debug-image exporter. The bundled
+[3D viewer helper](3d-inspection.md) supplies this inspection without modifying
+the estimator. CAD/posed mesh stays local.
 
 ## Registration, tracking, and inference
 

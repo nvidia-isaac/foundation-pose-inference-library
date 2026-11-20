@@ -25,6 +25,10 @@ generation code and metadata to distinguish measured, estimated, and rendered
 depth. Agreement between two renderers using the same GT is not independent
 validation of calibration or annotations.
 
+When annotations are absent, follow [pseudo references](pseudo-references.md)
+instead of inventing GT. Keep measured, RGB-derived, estimate-rendered, and
+kinematic references distinct in metrics, filenames, and conclusions.
+
 ## Prepare visible GT masks
 
 `prepare_bop.py` accepts a BOP scene, an explicit camera/image key, mesh directory,
@@ -64,6 +68,11 @@ registration mask controls initialization; it does **not** remove other depth
 from observed network crops. “GT mask + target reference” is not perfect full
 scene input. Synthetic depth sharing the evaluation GT is an oracle control,
 not a deployable correction or proof of physical depth accuracy.
+
+The [depth intervention helper](pseudo-references.md#prepare-and-replay-a-depth-intervention)
+also supports RGB-derived references and a valid-depth-only control that preserves
+the original hole pattern. It checks frame IDs, calibration, and replacement
+regions and produces manifests for the existing replay tool.
 
 ## Analyze candidates, then package evidence
 
